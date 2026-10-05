@@ -1,8 +1,8 @@
-"""Kiểm tra phần khung starter/: hợp đồng với eval.py, cú pháp, các stub còn là stub, notebook hợp lệ.
+"""Kiểm tra các module starter đã triển khai, hợp đồng với eval.py và notebook hợp lệ.
 
 Chạy từ thư mục gốc repo:
     python -m unittest discover -s tests -v
-Các module trong starter/ không import torch ở mức module nên test này chạy được không cần GPU.
+Các kiểm tra model/loss không cần GPU; cần cài các dependency huấn luyện.
 """
 import ast
 import json
@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import torch
 
 ROOT = Path(__file__).resolve().parent.parent
 STARTER = ROOT / "starter"
@@ -22,6 +23,7 @@ sys.path.insert(0, str(STARTER))
 
 import eval as ev  # noqa: E402
 import train  # noqa: E402
+import losses  # noqa: E402
 
 K = ev.NUM_CLASSES
 
@@ -57,7 +59,7 @@ class TestPredictionContract(unittest.TestCase):
             ev.save_predictions("unused.csv", ["a.jpg"], [0], np.ones((1, 5)) / 5)
 
 
-class TestTrainSkeleton(unittest.TestCase):
+class TestTrainHelpers(unittest.TestCase):
     def test_pred_path_follows_eval_naming(self):
         cfg = train.Config(exp_id="F01", seed=2, pred_dir="predictions")
         self.assertEqual(train.pred_path(cfg, "test"), Path("predictions/F01_seed2_test.csv"))
@@ -75,21 +77,22 @@ class TestTrainSkeleton(unittest.TestCase):
         self.assertEqual((c.epochs, c.batch_size, c.lr_backbone, c.lr_head, c.weight_decay),
                          (12, 64, 1e-4, 1e-3, 0.05))
 
+    def test_parse_overrides(self):
+        result = train.parse_overrides(["seed=2", "loss=focal", "ema_decay=none", "amp=false"])
+        self.assertEqual(result, {"seed": 2, "loss": "focal", "ema_decay": None, "amp": False})
+
 
 class TestStarterFiles(unittest.TestCase):
     def test_all_python_files_compile(self):
         for f in sorted(STARTER.glob("*.py")) + [ROOT / "eval.py"]:
             py_compile.compile(str(f), doraise=True)
 
-    def test_todo_stubs_are_still_stubs(self):
-        """Mỗi module khung phải còn nhiều hàm chưa cài đặt (sinh viên tự làm)."""
-        expected_min = {"dataset.py": 6, "model.py": 5, "losses.py": 6, "train.py": 10,
-                        "inference.py": 8, "benchmark.py": 3}
-        for name, minimum in expected_min.items():
+    def test_runtime_modules_have_no_unimplemented_stubs(self):
+        for name in ("dataset.py", "model.py", "losses.py", "train.py", "inference.py", "benchmark.py"):
             tree = ast.parse((STARTER / name).read_text(encoding="utf-8"))
             n = sum(1 for node in ast.walk(tree) if isinstance(node, ast.Raise)
                     and isinstance(node.exc, ast.Call) and getattr(node.exc.func, "id", "") == "NotImplementedError")
-            self.assertGreaterEqual(n, minimum, f"{name}: chỉ còn {n} stub, kỳ vọng >= {minimum}")
+            self.assertEqual(n, 0, f"{name}: còn {n} NotImplementedError stub")
 
     def test_starter_has_no_complete_helper_modules(self):
         """Mọi file trong starter/ đều là pseudo-code: không còn module hoàn chỉnh kiểu records.py."""
@@ -97,11 +100,32 @@ class TestStarterFiles(unittest.TestCase):
         for f in STARTER.glob("*.py"):
             self.assertNotIn("import records", f.read_text(encoding="utf-8"), f.name)
 
-    def test_cli_helpers_in_train_are_stubs(self):
-        with self.assertRaises(NotImplementedError):
-            train.parse_overrides(["seed=1"])
-        with self.assertRaises(NotImplementedError):
-            train.main()
+    def test_label_smoothing_zero_matches_cross_entropy(self):
+        logits = torch.randn(8, K)
+        targets = torch.randint(0, K, (8,))
+        actual = losses.LabelSmoothingCE(smoothing=0.0)(logits, targets)
+        expected = torch.nn.functional.cross_entropy(logits, targets)
+        torch.testing.assert_close(actual, expected)
+
+    def test_focal_gamma_zero_matches_cross_entropy(self):
+        logits = torch.randn(8, K)
+        targets = torch.randint(0, K, (8,))
+        actual = losses.FocalLoss(gamma=0.0)(logits, targets)
+        expected = torch.nn.functional.cross_entropy(logits, targets)
+        torch.testing.assert_close(actual, expected, atol=1e-6, rtol=0)
+
+    def test_mixup_and_cutmix_contract(self):
+        x = torch.rand(4, 3, 16, 16)
+        y = torch.arange(4)
+        for mode in ("mixup", "cutmix"):
+            mixed, targets = losses.mix_batch(x, y, alpha=1.0, mode=mode)
+            self.assertEqual(tuple(mixed.shape), tuple(x.shape))
+            self.assertEqual(tuple(targets[0].shape), tuple(y.shape))
+            self.assertEqual(tuple(targets[1].shape), tuple(y.shape))
+            self.assertGreaterEqual(targets[2], 0.0)
+            self.assertLessEqual(targets[2], 1.0)
+            loss = losses.mixed_loss(torch.nn.CrossEntropyLoss(), torch.randn(4, K), targets)
+            self.assertEqual(loss.ndim, 0)
 
     def test_notebook_is_valid_and_clean(self):
         nb = json.loads((STARTER / "lab_day2.ipynb").read_text(encoding="utf-8"))

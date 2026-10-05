@@ -3,7 +3,7 @@
 > Track 4 · Ngày 2 · *Tích chập, chuỗi, attention · backbone · huấn luyện · suy luận*
 > Bài lab này mở rộng **Lab #2** trong slide Day 2. Slide chỉ yêu cầu 1 backbone, 3 cách khởi tạo, có/không CutMix và TTA. Ở đây bạn làm đầy đủ: **≥ 5 backbone**, **nhiều công thức huấn luyện**, **nhiều cách suy luận**, rồi chọn cấu hình tốt nhất và báo cáo.
 
-Repo gồm **hướng dẫn, tiêu chí chấm, bộ khung code (pseudo-code) và công cụ đánh giá**. Bộ khung `starter/` chỉ có chữ ký hàm, docstring và các bước `TODO`: **bạn tự viết phần ruột** (model, loss, augmentation, vòng huấn luyện, TTA, đo độ trễ). Riêng `eval.py` đã hoàn chỉnh, bạn không sửa. Làm vậy để bạn hiểu từng thành phần trong slide, nhưng vẫn đo bằng cùng một thước.
+Repo gồm **hướng dẫn, tiêu chí chấm, mã huấn luyện tham khảo và công cụ đánh giá**. Các module Python trong `starter/` đã có pipeline train/evaluate, loss, augmentation, inference và latency để chạy bài lab; `eval.py` là công cụ đánh giá chính thức và không được sửa. Notebook `lab_day2_colab.ipynb` chạy experiment suite trên Google Colab, đóng gói kết quả vào `submissions/<mssv>_<ten>/`. Notebook `starter/lab_day2.ipynb` vẫn là notebook hướng dẫn ban đầu.
 
 | File | Dùng để làm gì |
 |---|---|
@@ -11,8 +11,17 @@ Repo gồm **hướng dẫn, tiêu chí chấm, bộ khung code (pseudo-code) v�
 | [`GUIDE.md`](GUIDE.md) | Quy trình từng bước, danh sách thí nghiệm, cấu trúc file xlsx và báo cáo, bẫy thường gặp |
 | [`RUBRIC.md`](RUBRIC.md) | Thang điểm 100, tiêu chí đạt, lỗi bị trừ điểm |
 | [`eval.py`](eval.py) | **Đã hoàn chỉnh.** Tính chỉ số đúng định nghĩa ở mục 2.2 và tự chấm phần I của RUBRIC (mục 2.4) |
-| [`starter/`](starter) | **Pseudo-code** để bạn hoàn thiện: `dataset.py`, `model.py`, `losses.py`, `train.py`, `inference.py`, `benchmark.py`, `lab_day2.ipynb` |
-| [`tests/`](tests) | Test của `eval.py` và của bộ khung (chạy được không cần GPU) |
+| [`starter/`](starter) | Module Python chạy pipeline: `dataset.py`, `model.py`, `losses.py`, `train.py`, `inference.py`, `benchmark.py` |
+| [`lab_day2_colab.ipynb`](lab_day2_colab.ipynb) | Notebook Colab cho 5 backbone, ablation huấn luyện, so sánh inference, final seeds và export submission |
+| [`submissions/2A202602528_VuongVietHoang/`](submissions/2A202602528_VuongVietHoang) | Cấu trúc nộp bài đã đặt theo MSSV và họ tên; chạy notebook để tạo kết quả |
+| [`tests/`](tests) | Test hợp đồng dự đoán và một số hàm huấn luyện; không cần GPU nhưng cần dependencies Python |
+
+### Chạy trên Google Colab
+
+1. Điền MSSV và họ tên trong `lab_day2_colab.ipynb`.
+2. Tải `lab_code_bundle.zip` và `images.zip` lên `MyDrive/DeepWeedsLab/`.
+3. Mở notebook bằng Colab, chọn GPU runtime, rồi chạy các cell theo thứ tự. Notebook lưu log/checkpoint trên Drive để có thể tiếp tục các experiment đã hoàn tất sau khi runtime bị ngắt.
+4. Sau khi hoàn tất, thư mục `MyDrive/DeepWeedsLab/submissions/<mssv>_<ten>/` có `results.xlsx`, `report.md`, `README.md`, `code/`, `curves/` và `predictions/`.
 
 ---
 
